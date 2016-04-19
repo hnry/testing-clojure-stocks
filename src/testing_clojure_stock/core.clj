@@ -11,7 +11,8 @@
   (:import yahoofinance.YahooFinance
            yahoofinance.histquotes.Interval))
 
-(def stocklist (atom #{"YHOO" "AAPL"}))
+(def stocklist (atom #{"YHOO" "MSFT" "GOOG" "AAPL"}))
+(def stock-data-cache (atom {}))
 (def channels (atom #{}))
 
 (defn parse-yahoo-result
@@ -33,11 +34,19 @@
         data (.getHistory stock)]
     (parse-yahoo-result data)))
 
+(defn get-quote [symbol]
+  (let [data (@stock-data-cache (keyword symbol))]
+    (if (nil? data)
+      (do
+        (let [result (get-historical-stock-quote symbol)]
+          (swap! stock-data-cache assoc (keyword symbol) result)
+          result))
+      data)))
+
 ;; don't really need
 ;; (defn route-stock [stock]
 ;;   (let [result (get-historical-stock-quote stock)]
 ;;     {:status 200 :headers {"Content-Type" "application/json"} :body (json/write-str result)}))
-
 
 (defn route-home []
   (render-file "views/index.html" []))
@@ -47,7 +56,7 @@
     (send! channel (json/write-str {:action "list" :stocks @stocklist}))))
 
 (defn socket-send-data! [channel symbol]
-  (send! channel (json/write-str {:action "data" :symbol symbol :data (get-historical-stock-quote symbol)})))
+  (send! channel (json/write-str {:action "data" :symbol symbol :data (get-quote symbol)})))
 
 (defn socket-receive [channel data]
   (let [data (json/read-str data)
