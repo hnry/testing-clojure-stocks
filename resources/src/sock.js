@@ -16,7 +16,10 @@ var Store = {
   },
 
   init() {
-    this._socket = new WebSocket("ws://" + location.host + "/ws")
+    let proto = "ws"
+    if (location.protocol == "https:") proto = proto + "s"
+
+    this._socket = new WebSocket(proto + "://" + location.host + "/ws")
     this._socket.onopen = (event) => {
       this._socket.send(JSON.stringify({ action: "list" }))
     }
