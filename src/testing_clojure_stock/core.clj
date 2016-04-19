@@ -29,23 +29,30 @@
 (defn route-home []
   (render-file "views/index.html" []))
 
-(defn socket-send! [users]
+(defn socket-send-list! [users]
   (doseq [channel users]
     (send! channel (json/write-str {:action "list" :stocks @stocklist}))))
 
-(defn socket-receive [channel data] ;; TODO needs work
-  (let [data (json/read-str data)]
+(defn socket-send-data! [channel symbol]
+  (send! channel (json/write-str {:action "data" :symbol symbol :data [123, 10, 11, 12]})))
+
+(defn socket-receive [channel data]
+  (let [data (json/read-str data)
+        ^String symbol (data "symbol")]
     (case (data "action")
       "add" (do
-                 (swap! stocklist conj (data "symbol"))
-                 (socket-send! @channels))
+                 (swap! stocklist conj (.toUpperCase symbol))
+                 (socket-send-list! @channels))
+      "remove" (do
+                 (swap! stocklist #(remove #{symbol} %))
+                 (socket-send-list! @channels))
+      "data" (socket-send-data! channel symbol)
       (socket-send! [channel])))) ;; default send back list to specific client
 
 (defn socket-connect! [channel]
   (swap! channels conj channel))
 
 (defn socket-disconnect! [channel status]
-  (println "client disconnected")
   (swap! channels #(remove #{channel} %)))
 
 (defn ws-handler [request]

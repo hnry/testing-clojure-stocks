@@ -11,7 +11,13 @@ var Store = {
     this._subscribers.forEach(fn => fn(data));
   },
 
-  send(payload) {
+  getStockList() { this.socketSend("list") },
+  getStockData(symbol) { this.socketSend("data", symbol) },
+  addStock(symbol) { this.socketSend("add", symbol) },
+  removeStock(symbol) { this.socketSend("remove", symbol) },
+  socketSend(action, symbol) {
+    let payload = { action }
+    if (symbol) payload.symbol = symbol
     this._socket.send(JSON.stringify(payload))
   },
 

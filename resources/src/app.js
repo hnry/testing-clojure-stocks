@@ -1,29 +1,71 @@
+/**
+ * think of as...
+ * arr.diff(arr2) but without attaching to Array prototype
+ *
+ * returns an array of the difference of arr2 in arr1
+ * based on pred fn
+ */
+function diff(arr, arr2, pred) {
+  return arr2.filter(b => {
+    return arr.some(a => {
+      return pred(a, b)
+    }) !== true
+  })
+}
+
 class Chart extends React.Component {
   constructor() {
     super()
+    this.chart = null
   }
 
   componentDidMount() {
-    Highcharts.StockChart({
+    this.chart = new Highcharts.StockChart({
       chart: { renderTo: this.refs.chart },
       title: { text: "" },
-      credits: { enabled: false }
+      credits: { enabled: false },
+      rangeSelector: {
+        selected: 1
+      }
     })
   }
 
-  shouldComponentUpdate() {
+  shouldComponentUpdate(newProp) {
+    // add missing stocks to chart
+    diff(this.chart.series, newProp.stocks, (chart, stock) => {
+      return chart.name === stock
+    }).forEach(stock => {
+      const data = newProp.stockData
+      if (data[stock] && data[stock].length) {
+        this.chart.addSeries({ name: stock, data: newProp.stockData[stock] })
+      }
+    })
+
+    // remove stocks that are not active anymore
+    diff(newProp.stocks, this.chart.series, (stock, chart) => {
+      return chart.name === stock || chart.name === "Navigator"
+    }).forEach(chart => {
+      chart.remove()
+    })
+    
     return false
   }
 
   render() {
-    return (<div ref="chart" style={{width:"100%", height:"400px"}}></div>)
+    return (<div ref="chart" style={{height:"400px",width:"100%"}}></div>)
   }
+}
+
+function Stock(props) {
+  return (<li>
+          {props.stock} <div onClick={props.removeHandler.bind(null, props.stock)}>remove</div>
+         </li>)
 }
 
 function StocksList(props) {
   const list = (stocks) => {
     return stocks.map((stock, idx) => {
-      return (<li key={idx}>{stock}</li>)
+      return (<Stock key={idx} stock={stock} removeHandler={props.removeHandler} />)
     })
   }
 
@@ -65,7 +107,8 @@ class App extends React.Component {
   constructor() {
     super()
     this.state = {
-      stocks: []
+      list: [],
+      stocks: {} // {symbol: data}
     }
 
     this.update = this.update.bind(this)
@@ -78,23 +121,27 @@ class App extends React.Component {
   update(data) {
     switch(data.action) {
     case "list":
-      this.setState({ stocks: data.stocks })
+      this.setState({ list: data.stocks })
+      // get stock data for unknown stocks
+      data.stocks.forEach((stock) => {
+        if (!this.state.stocks[stock]) Store.getStockData(stock)
+      })
+      break
     case "data":
+      let stocks = this.state.stocks
+      stocks[data.symbol] = data.data
+      this.setState({ stocks: stocks })
+      break
     }
   }
 
-  addStock(stock) {
-    Store.send({ action: "add", symbol: stock })
-  }
-
-  removeStock(stock) {
-    Store.send({ action: "remove", symbol: stock })
-  }
+  addStock(stock) { Store.addStock(stock) }
+  removeStock(stock) { Store.removeStock(stock) }
 
   render() {
     return (<div>
-            <Chart />
-            <StocksList stocks={this.state.stocks} addHandler={this.addStock} />
+            <Chart stocks={this.state.list} stockData={this.state.stocks} />
+            <StocksList stocks={this.state.list} addHandler={this.addStock} removeHandler={this.removeStock} />
             </div>)
   }
 }
