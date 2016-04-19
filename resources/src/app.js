@@ -19,6 +19,17 @@ class Chart extends React.Component {
     this.chart = null
   }
 
+  parseStockData(data) {
+    const round = function(n) {
+      return parseFloat(n.toFixed(2))
+    }
+
+    return data.map(quote => {
+      const date = new Date(quote.date)
+      return [date.getTime(), round(quote.open), round(quote.high), round(quote.low), round(quote.close)]
+    }).reverse()
+  }
+
   componentDidMount() {
     this.chart = new Highcharts.StockChart({
       chart: { renderTo: this.refs.chart },
@@ -26,7 +37,8 @@ class Chart extends React.Component {
       credits: { enabled: false },
       rangeSelector: {
         selected: 1
-      }
+      },
+      series: { type: "candlestick" }
     })
   }
 
@@ -37,7 +49,8 @@ class Chart extends React.Component {
     }).forEach(stock => {
       const data = newProp.stockData
       if (data[stock] && data[stock].length) {
-        this.chart.addSeries({ name: stock, data: newProp.stockData[stock] })
+        const convertedData = this.parseStockData(data[stock])
+        this.chart.addSeries({ name: stock, data: convertedData })
       }
     })
 
@@ -47,7 +60,7 @@ class Chart extends React.Component {
     }).forEach(chart => {
       chart.remove()
     })
-    
+
     return false
   }
 

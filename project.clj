@@ -7,6 +7,7 @@
                  [compojure "1.5.0"]
                  [http-kit "2.2.0-alpha1"]
                  [environ "1.0.2"]
+                 [org.clojure/core.async "0.2.374"]
                  [selmer "1.0.4"]
                  [com.novemberain/monger "3.0.2"]
                  [com.yahoofinance-api/YahooFinanceAPI "3.1.0"]
