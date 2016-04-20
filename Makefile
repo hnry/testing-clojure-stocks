@@ -8,9 +8,9 @@ build: build_js
 build_js:
 	@echo "building javascript"
 	mkdir -p resources/public
-	sass --update --sourcemap=none resources/src:resources/public
 	npm install
 	cat node_modules/react/dist/react.min.js node_modules/react-dom/dist/react-dom.min.js > resources/public/react.js
+	node_modules/.bin/node-sass --output-style compressed resources/src/style.scss resources/public/style.css
 	node_modules/.bin/babel --no-comments --minified resources/src -o resources/public/app.js
 
 watch:
