@@ -45,18 +45,20 @@ class Chart extends React.Component {
   shouldComponentUpdate(newProp) {
     // add missing stocks to chart
     diff(this.chart.series, newProp.stocks, (chart, stock) => {
-      return chart.name === stock
+      return chart.name === stock.symbol
     }).forEach(stock => {
+      const symbol = stock.symbol
       const data = newProp.stockData
-      if (data[stock] && data[stock].length) {
-        const convertedData = this.parseStockData(data[stock])
-        this.chart.addSeries({ name: stock, data: convertedData })
+      if (stock.status != "invalid" && data[symbol] && data[symbol].length) {
+        const convertedData = this.parseStockData(data[symbol])
+        const series = this.chart.addSeries({ name: symbol, data: convertedData })
+        newProp.updateStatus(symbol, series)
       }
     })
 
     // remove stocks that are not active anymore
     diff(newProp.stocks, this.chart.series, (stock, chart) => {
-      return chart.name === stock || chart.name === "Navigator"
+      return chart.name === stock.symbol || chart.name === "Navigator"
     }).forEach(chart => {
       chart.remove()
     })
@@ -70,9 +72,22 @@ class Chart extends React.Component {
 }
 
 function Stock(props) {
-  return (<li>
-          {props.stock} <div onClick={props.removeHandler.bind(null, props.stock)}>remove</div>
-         </li>)
+  var cls, styl
+  switch(props.stock.status) {
+  case "invalid":
+    cls = "stock-invalid"
+    break
+  case "waiting":
+    cls = "stock-waiting"
+    break
+  default: // a color ~ data is in
+    cls = "stock-ok"
+    styl = { borderBottomColor: props.stock.status }
+  }
+
+  return (<li className={cls} style={styl}>
+      <div id="remove-stock" onClick={props.removeHandler.bind(null, props.stock.symbol)}>x</div>{props.stock.symbol}
+              </li>)
 }
 
 function StocksList(props) {
@@ -82,13 +97,16 @@ function StocksList(props) {
     })
   }
 
-  return (<div>
-         Stocks:
-         <ul id="stock-list">
+  return (<div className="stock-list-wrap">
+             <div className="stock-header">
+                 <h3>Stocks</h3>
+                 <StocksForm addHandler={props.addHandler} />
+             </div>
+
+          <ul id="stock-list">
           {list(props.stocks)}
-         </ul>
-          <StocksForm addHandler={props.addHandler} />
-         </div>)
+          </ul>
+          </div>)
 }
 
 class StocksForm extends React.Component {
@@ -100,12 +118,15 @@ class StocksForm extends React.Component {
   }
 
   add() {
-    this.props.addHandler(this.state.input)
-    this.setState({ input: "" })
+    const txt = this.state.input.trim()
+    if (txt) {
+      this.props.addHandler(txt)
+      this.setState({ input: "" })
+    }
   }
 
   textChange(ev) {
-    this.setState({ input: ev.target.value })
+    this.setState({ input: ev.target.value.toUpperCase() })
   }
 
   render() {
@@ -120,7 +141,8 @@ class App extends React.Component {
   constructor() {
     super()
     this.state = {
-      list: [],
+      list: [],  // [{symbol: XYZ,
+                 //   status: #color, "waiting", "invalid" }]
       stocks: {} // {symbol: data}
     }
 
@@ -131,19 +153,43 @@ class App extends React.Component {
     Store.subscribe(this.update.bind(this))
   }
 
+  // returns index
+  findStockFromList(stock) {
+    for (let i = 0; i < this.state.list.length; i++) {
+      if (this.state.list[i].symbol === stock) {
+        return i
+      }
+    }
+    return false
+  }
+
   update(data) {
     switch(data.action) {
     case "list":
-      this.setState({ list: data.stocks })
+      const newlist = data.stocks.map(stock => {
+        const oldstock = this.findStockFromList(stock)
+        let status = "waiting"
+        if (oldstock !== false) status = this.state.list[oldstock].status
+        return { symbol: stock, status }
+      })
+
+      this.setState({ list: newlist })
+
       // get stock data for unknown stocks
-      data.stocks.forEach((stock) => {
-        if (!this.state.stocks[stock]) Store.getStockData(stock)
+      newlist.forEach((stock) => {
+        if (stock.status == "waiting") Store.getStockData(stock.symbol)
       })
       break
     case "data":
       let stocks = this.state.stocks
-      stocks[data.symbol] = data.data
-      this.setState({ stocks: stocks })
+      let list = this.state.list
+      if (data.data.error) {
+        const updateStock = this.findStockFromList(data.symbol)
+        list[updateStock].status = "invalid"
+      } else {
+        stocks[data.symbol] = data.data
+      }
+      this.setState({ stocks, list })
       break
     }
   }
@@ -151,9 +197,19 @@ class App extends React.Component {
   addStock(stock) { Store.addStock(stock) }
   removeStock(stock) { Store.removeStock(stock) }
 
+  /*
+   * updates the symbol's status to be of the color line in the chart
+   */
+  updateStockStatus(stock, chart) {
+    const i = this.findStockFromList(stock)
+    const list = this.state.list
+    list[i].status = chart.color
+    this.setState({ list })
+  }
+
   render() {
     return (<div>
-            <Chart stocks={this.state.list} stockData={this.state.stocks} />
+            <Chart stocks={this.state.list} stockData={this.state.stocks} updateStatus={this.updateStockStatus.bind(this)} />
             <StocksList stocks={this.state.list} addHandler={this.addStock} removeHandler={this.removeStock} />
             </div>)
   }

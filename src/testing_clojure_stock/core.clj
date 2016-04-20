@@ -29,10 +29,12 @@
 
 (defn get-historical-stock-quote
   [symbol]
-  (let [symbol (.toUpperCase symbol)
-        stock (YahooFinance/get symbol Interval/DAILY)
-        data (.getHistory stock)]
-    (parse-yahoo-result data)))
+  (let [symbol (.toUpperCase symbol)]
+    (try (do
+           (let [stock (YahooFinance/get symbol Interval/DAILY)
+                 data (.getHistory stock)]
+             (parse-yahoo-result data)))
+         (catch Exception e {:symbol symbol :error (.toString e)}))))
 
 (defn get-quote [symbol]
   (let [data (@stock-data-cache (keyword symbol))]
@@ -56,7 +58,8 @@
     (send! channel (json/write-str {:action "list" :stocks @stocklist}))))
 
 (defn socket-send-data! [channel symbol]
-  (send! channel (json/write-str {:action "data" :symbol symbol :data (get-quote symbol)})))
+  (let [data (get-quote symbol)]
+    (send! channel (json/write-str {:action "data" :symbol symbol :data (get-quote symbol)}))))
 
 (defn socket-receive [channel data]
   (let [data (json/read-str data)

@@ -8,6 +8,7 @@ build: build_js
 build_js:
 	@echo "building javascript"
 	mkdir -p resources/public
+	sass --update --sourcemap=none resources/src:resources/public
 	npm install
 	cat node_modules/react/dist/react.min.js node_modules/react-dom/dist/react-dom.min.js > resources/public/react.js
 	node_modules/.bin/babel --no-comments --minified resources/src -o resources/public/app.js
@@ -16,6 +17,9 @@ watch:
 	@echo "auto-building javascript"
 	cat node_modules/react/dist/react.js node_modules/react-dom/dist/react-dom.js > resources/public/react.js
 	node_modules/.bin/babel --no-comments --watch resources/src -o resources/public/app.js
+
+watch_css:
+	sass --watch resources/src:resources/public
 
 test: test_js
 
